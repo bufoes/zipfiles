@@ -1,0 +1,45 @@
+name: Create ZIPs from bufoes.github.io
+
+on:
+  workflow_dispatch: # manual trigger (can be changed later to schedule or repo A trigger)
+
+jobs:
+  create-zips:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo B (self)
+        uses: actions/checkout@v4
+
+      - name: Clone Repo A (bufoes.github.io)
+        run: |
+          git clone https://x-access-token:${{ secrets.PAT }}@github.com/bufoes/bufoes.github.io.git repo-a
+
+      - name: Install zip
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Create ZIPs from folders in Repo A
+        run: |
+          mkdir -p zips
+          for dir in acm fbos rac frc herc; do
+            if [ -d "repo-a/$dir" ]; then
+              echo "Zipping $dir..."
+              zip -r "zips/$dir.zip" "repo-a/$dir"
+            else
+              echo "Directory repo-a/$dir not found, skipping."
+            fi
+          done
+
+      - name: Commit and push ZIP files to Repo B
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add zips/*.zip
+
+          if git diff --cached --quiet; then
+            echo "No ZIP changes to commit"
+          else
+            git commit -m "Update ZIP files from bufoes.github.io"
+            git push
+          fi
