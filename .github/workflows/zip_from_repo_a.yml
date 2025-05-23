@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Checkout Repo B (self)
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
 
       - name: Clone Repo A
         env:
@@ -26,7 +28,7 @@ jobs:
           for dir in acm fbos rac frc herc; do
             if [ -d "repo-a/$dir" ]; then
               echo "Zipping $dir"
-              zip -r "zips/$dir.zip" "repo-a/$dir"
+              (cd "repo-a/$dir" && zip -r "../../zips/$dir.zip" . -i '*.pdf')
             else
               echo "$dir does not exist in repo-a, skipping"
             fi
@@ -36,12 +38,19 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config core.autocrlf false
 
-          git add zips/*.zip
+          # Add only ZIP files that exist
+          for dir in acm fbos rac frc herc; do
+            if [ -f "zips/$dir.zip" ]; then
+              git add "zips/$dir.zip"
+            fi
+          done
 
-          if git diff --cached --quiet; then
-            echo "No changes in ZIP files"
-          else
-            git commit -m "Update ZIPs from Repo A content"
+          if ! git diff --cached --quiet; then
+            git commit -m "Update ZIPs from Repo A content [skip ci]"
+            git remote set-url origin https://x-access-token:${{ secrets.PAT }}@github.com/${{ github.repository }}
             git push
+          else
+            echo "No changes to ZIP files"
           fi
